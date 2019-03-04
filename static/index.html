@@ -30,16 +30,19 @@ var host = window.location.host;
 var context = canvas.getContext("2d");
 var W = canvas.width  = window.innerWidth-6;
 var H = canvas.height = window.innerHeight-50;
+var MAX_ENTITIES = 100;
+var LAST_ENTITY = 0;
 
-
-function sendJSONXMLHTTPRequest(url, objects, callback) {
+function sendJSONXMLHTTPRequest(url, objects, callback = null) {
     var xhr = new XMLHttpRequest();
     xhr.onreadystatechange = function () {
         if (xhr.readyState==4) {
             try {
                 if (xhr.status==200) {
-                    //XXX: parse some JSON from the request!
-                    //XXX: Pass the data to the callback!
+                    // parse some JSON from the request!
+                    data = JSON.parse(xhr.responseText);
+                    // Pass the data to the callback!
+                    callback && callback(data); // do you hate me?
                 }
             } 
             catch(e) {
@@ -47,9 +50,13 @@ function sendJSONXMLHTTPRequest(url, objects, callback) {
             }
         }
     };
-    //XXX: POST to a URL
-    //XXX: set the mimetype and the accept headers!
+    // POST to a URL
+    xhr.open("POST", url);
+    // set the mimetype and the accept headers!
     // Remember to use application/json !
+    xhr.setRequestHeader("Content-Type", "application/json");
+    xhr.setRequestHeader("Accept", "application/json");
+    xhr.send(JSON.stringify(objects))
 }
 
 
@@ -92,9 +99,60 @@ function clearFrame() {
 // This actually draws the frame
 function renderFrame() {
     clearFrame();
-    for (var key in world) {
-        var entity = world[key];
-        drawCircle(context,prepEntity(entity));
+    // for (var key in world) {
+    //     var entity = world[key];
+    //     drawCircle(context,prepEntity(entity));
+    // }
+    keys = Object.keys(world);
+    aLine = [];
+    lines = [];
+    onLine = false;
+    firstKeyStart = null;
+    minNo = Math.min(MAX_ENTITIES, keys.length)
+    for (let i = 0; i < minNo * 2; i++) {
+        if (firstKeyStart && firstKeyStart === (i % minNo)) {
+            lines.push(aLine);
+            break;
+        }
+        key = keys[i % minNo];
+        p = world[key];
+        if (p.colour === "blue") {
+            if (!firstKeyStart) {
+                firstKeyStart = i % minNo;
+            }
+            aLine.push(key);
+            onLine = true;
+        }
+        else if (onLine) {
+            aLine.push(key);
+            if (p.colour === "red" || (key === LAST_ENTITY && i > minNo) || (i % minNo) === firstKeyStart) {
+                lines.push(aLine);
+                aLine = [];
+            }
+        }
+    };
+    if (!lines || lines.length === 0) {
+        lines.push(keys);
+    }
+    console.log(lines);
+    var randColVal = () => {
+        return Math.floor(Math.random() * 256);
+    }
+    with(context) {
+        lineWidth = 3;
+        lines.forEach((line) => {
+            var grd = createLinearGradient(0, 0, 170, 0);
+            grd.addColorStop(0, `rgb(${randColVal()}, ${randColVal()}, ${randColVal()}`);
+            grd.addColorStop(1, `rgb(${randColVal()}, ${randColVal()}, ${randColVal()}`);
+            fillStyle = grd;
+            strokeStyle = fillStyle;
+            beginPath();
+            if (line.length) moveTo(world[line[0]].x, world[line[0]].y);
+            line.forEach((key) => {
+                lineTo(world[key].x, world[key].y);
+                stroke();
+            });
+        });
     }
 }
 
@@ -137,14 +195,15 @@ function getPosition(e) {
 function addEntity(entity, data) {
     world[entity] = data;
     drawNextFrame(); // (but should we?)
-    //XXX: Send a XHTML Request that updates the entity you just  modified!
-
+    // Send a XHTML Request that updates the entity you just  modified!
+    sendJSONXMLHTTPRequest("/entity/" + entity, data)
 }
 
 var counter = 0;
 function addEntityWithoutName(data) {
     //var name = "X"+Math.floor((Math.random()*100)+1);
-    var name = "X"+(counter++)%100;
+    var name = "X"+(counter++)%MAX_ENTITIES;
+    LAST_ENTITY = name;
     addEntity(name,data);
 }
 
@@ -261,8 +320,20 @@ mouse.mousedraggers.push(function(x,y,clicked,e) {
 
 
 function update() {
-    //XXX: TODO Get the world from the webservice using a XMLHTTPRequest
-    drawFrame();
+    // TODO Get the world from the webservice using a XMLHTTPRequest
+    var xhr = new XMLHttpRequest();
+    xhr.onreadystatechange = function () {
+        if (xhr.readyState==4) {
+            if (xhr.status==200) {
+                data = JSON.parse(xhr.responseText);
+                world = data;
+                drawFrame();
+            }
+        }
+    }
+    xhr.open("POST", "/world");
+    xhr.setRequestHeader("Accept", "application/json");
+    xhr.send();
 }
 
 // 30 frames per second
