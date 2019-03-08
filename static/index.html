@@ -23,6 +23,7 @@
     <script src="json2.js"></script>
   </head> 
   <body bgcolor="black" height="100%" width="100%"> 
+    <button onclick="var xhr = new XMLHttpRequest();xhr.open('GET', '/clear');xhr.send();window.location.reload();">CLEAR</button>
     <canvas id="c" width="100%" height="100%" style="-webkit-tap-highlight-color: transparent;"></canvas> 
     <script>
 var canvas = document.getElementById('c');
@@ -59,6 +60,15 @@ function sendJSONXMLHTTPRequest(url, objects, callback = null) {
     xhr.send(JSON.stringify(objects))
 }
 
+function clear() {
+    console.log("trying to clear");
+    var xhr = new XMLHttpRequest();
+    xhr.onreadystatechange = function () {
+        console.log("Did I clear?")
+    }
+    xhr.open("GET", "/clear");
+    xhr.send();
+}
 
 world = {};
 
@@ -106,31 +116,22 @@ function renderFrame() {
     keys = Object.keys(world);
     aLine = [];
     lines = [];
-    onLine = false;
-    firstKeyStart = null;
-    minNo = Math.min(MAX_ENTITIES, keys.length)
-    for (let i = 0; i < minNo * 2; i++) {
-        if (firstKeyStart && firstKeyStart === (i % minNo)) {
-            lines.push(aLine);
-            break;
-        }
-        key = keys[i % minNo];
-        p = world[key];
+    console.log(world);
+    for (let i = 0; i < keys.length; i++) {
+        p = world[keys[i]];
         if (p.colour === "blue") {
-            if (!firstKeyStart) {
-                firstKeyStart = i % minNo;
-            }
-            aLine.push(key);
-            onLine = true;
+            aLine = [keys[i]]
+            continue;
         }
-        else if (onLine) {
-            aLine.push(key);
-            if (p.colour === "red" || (key === LAST_ENTITY && i > minNo) || (i % minNo) === firstKeyStart) {
-                lines.push(aLine);
-                aLine = [];
-            }
+        aLine.push(keys[i]);
+        if (p.colour === "red") {
+            lines.push(aLine);
+            aLine = [];
         }
     };
+    if (aLine.length) {
+        lines.push(aLine);
+    }
     if (!lines || lines.length === 0) {
         lines.push(keys);
     }
@@ -147,10 +148,13 @@ function renderFrame() {
             fillStyle = grd;
             strokeStyle = fillStyle;
             beginPath();
-            if (line.length) moveTo(world[line[0]].x, world[line[0]].y);
-            line.forEach((key) => {
-                lineTo(world[key].x, world[key].y);
-                stroke();
+            line.forEach((key, i) => {
+                if (i === 0) {
+    
+                } else {
+                    lineTo(world[key].x, world[key].y);
+                    stroke();
+                }
             });
         });
     }
@@ -202,7 +206,7 @@ function addEntity(entity, data) {
 var counter = 0;
 function addEntityWithoutName(data) {
     //var name = "X"+Math.floor((Math.random()*100)+1);
-    var name = "X"+(counter++)%MAX_ENTITIES;
+    var name = "X"+(counter++);
     LAST_ENTITY = name;
     addEntity(name,data);
 }
@@ -328,6 +332,9 @@ function update() {
                 data = JSON.parse(xhr.responseText);
                 world = data;
                 drawFrame();
+                if (counter === 0) {
+                    counter = Object.keys(world).length + 10;
+                }
             }
         }
     }
