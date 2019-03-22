@@ -330,8 +330,9 @@ function update() {
         if (xhr.readyState==4) {
             if (xhr.status==200) {
                 data = JSON.parse(xhr.responseText);
+                console.log(data)
                 world = data;
-                drawFrame();
+                renderFrame();
                 if (counter === 0) {
                     counter = Object.keys(world).length + 10;
                 }
